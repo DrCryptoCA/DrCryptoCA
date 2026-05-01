@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>APEX SCAN — DexScreener Momentum Scanner</title>
+  <style>
+    :root {
+      --bg: #070b14;
+      --panel: #111827;
+      --panel-2: #0f172a;
+      --text: #dbeafe;
+      --muted: #9ca3af;
+      --good: #22c55e;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+      --accent: #38bdf8;
+      --border: #1f2937;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      background: radial-gradient(circle at top right, #0b1224 0%, var(--bg) 45%);
+      color: var(--text);
+      padding: 16px;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .header, .controls, .terminal {
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    }
+    h1 { margin: 0 0 6px; font-size: 1.2rem; color: #7dd3fc; }
+    .sub { color: var(--muted); font-size: 0.9rem; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .chip {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.8rem;
+      color: #c4b5fd;
+      background: #0b1020;
+    }
+    label { font-size: 0.85rem; color: var(--muted); }
+    select, button {
+      background: #0b1020;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-family: inherit;
+    }
+    button {
+      cursor: pointer;
+      background: #082f49;
+      border-color: #0c4a6e;
+      color: #bae6fd;
+      font-weight: 600;
+    }
+    .grid { display: grid; gap: 10px; }
+    .card {
+      border: 1px solid var(--border);
+      background: #0b1020;
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .cardTop { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .pair { font-weight: 700; color: #bfdbfe; }
+    .price { color: #e2e8f0; font-size: 0.95rem; }
+    .score {
+      min-width: 62px;
+      text-align: right;
+      font-weight: 800;
+      color: #a7f3d0;
+    }
+    .metrics {
+      margin-top: 8px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 6px;
+      font-size: 0.8rem;
+      color: #cbd5e1;
+    }
+    .metric span { color: var(--muted); }
+    .delta.pos { color: var(--good); }
+    .delta.neg { color: var(--bad); }
+    details { margin-top: 8px; border-top: 1px dashed #1e293b; padding-top: 8px; }
+    summary { cursor: pointer; color: #93c5fd; }
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+    .tag { border-radius: 6px; padding: 3px 8px; font-size: 0.75rem; border: 1px solid; }
+    .tag.good { color: #86efac; border-color: #166534; background: #052e16; }
+    .tag.warn { color: #fcd34d; border-color: #92400e; background: #451a03; }
+    .links a { color: var(--accent); margin-right: 10px; text-decoration: none; font-size: 0.85rem; }
+    .footer { color: var(--muted); font-size: 0.8rem; margin-top: 8px; }
+    .status { color: #c4b5fd; font-size: 0.86rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>APEX SCAN // Terminal Momentum Scanner</h1>
+      <div class="sub">Live DexScreener momentum scan for breakout candidates (top 10).</div>
+      <div class="row" style="margin-top:8px">
+        <div class="chip" id="utcClock">UTC: --:--:--</div>
+        <div class="chip" id="scanStats">Scan stats: idle</div>
+        <div class="chip">Engine: 12-signal weighted model</div>
+      </div>
+    </div>
+
+    <div class="controls row">
+      <div>
+        <label for="chain">Chain</label><br />
+        <select id="chain">
+          <option value="all">All</option>
+          <option value="solana">SOL</option>
+          <option value="ethereum">ETH</option>
+          <option value="bsc">BSC</option>
+          <option value="base">BASE</option>
+        </select>
+      </div>
+      <div>
+        <label for="minLiq">Min Liquidity</label><br />
+        <select id="minLiq">
+          <option value="10000">$10K</option>
+          <option value="25000">$25K</option>
+          <option value="50000" selected>$50K</option>
+          <option value="100000">$100K</option>
+          <option value="250000">$250K</option>
+          <option value="500000">$500K</option>
+        </select>
+      </div>
+      <div>
+        <label>&nbsp;</label><br />
+        <button id="scanBtn">Run Live Scan</button>
+      </div>
+      <div class="status" id="status">Ready.</div>
+    </div>
+
+    <div class="terminal">
+      <div class="grid" id="results"></div>
+      <div class="footer">If opened as <code>file://</code>, CORS may block API calls. Run with <code>python -m http.server</code> or deploy to hosting.</div>
+    </div>
+  </div>
+
+<script>
+const API = 'https://api.dexscreener.com';
+const $ = (id) => document.getElementById(id);
+
+setInterval(() => {
+  $('utcClock').textContent = `UTC: ${new Date().toISOString().slice(11,19)}`;
+}, 1000);
+
+function num(v, d=2){ return Number(v||0).toLocaleString(undefined,{maximumFractionDigits:d}); }
+function usd(v){ return `$${num(v,2)}`; }
+function pct(v){ return `${v>0?'+':''}${num(v,2)}%`; }
+
+function scorePair(p){
+  const ch = p.priceChange || {};
+  const vol = p.volume || {};
+  const tx = p.txns || {};
+  const liq = p.liquidity?.usd || 0;
+  const mcap = p.marketCap || p.fdv || 0;
+
+  const m5 = ch.m5 || 0, h1 = ch.h1 || 0, h6 = ch.h6 || 0, h24 = ch.h24 || 0;
+  const vh1 = vol.h1 || 0, v24 = vol.h24 || 0;
+  const b1 = tx.h1?.buys || 0, s1 = tx.h1?.sells || 0;
+
+  const volLiq = liq ? v24 / liq : 0;
+  const volMcap = mcap ? v24 / mcap : 0;
+  const buySell = s1 ? b1 / s1 : (b1 > 0 ? 2 : 1);
+  const accel = (m5 * 12) - h1;
+
+  let score = 50;
+  const good = [];
+  const warn = [];
+
+  if (m5 > 1) { score += 6; good.push('5m momentum positive'); }
+  if (h1 > 2) { score += 8; good.push('1h breakout structure'); }
+  if (h6 > 5) { score += 7; good.push('6h trend in force'); }
+  if (h24 > 10) { score += 5; good.push('24h trend support'); }
+  if (m5 > 0 && h1 > 0 && h6 > 0) { score += 7; good.push('multi-timeframe alignment'); }
+
+  if (volLiq > 0.6) { score += 10; good.push('strong volume/liquidity rotation'); }
+  else if (volLiq > 0.3) { score += 5; }
+
+  if (volMcap > 0.15) { score += 6; good.push('high relative turnover'); }
+  if (buySell > 1.2) { score += 8; good.push('buy pressure dominates'); }
+  if (accel > 1.5) { score += 8; good.push('momentum acceleration detected'); }
+
+  if (liq < 30000) { score -= 14; warn.push('thin liquidity'); }
+  else if (liq < 75000) { score -= 6; warn.push('moderate liquidity risk'); }
+  else { score += 4; }
+
+  if (h1 < -2) { score -= 10; warn.push('1h weakness'); }
+  if (h24 < -10) { score -= 8; warn.push('24h drawdown pressure'); }
+
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  return {
+    score, good, warn,
+    rationale: `${p.baseToken?.symbol || 'Token'} shows ${m5 > 0 ? 'positive' : 'mixed'} short-term pace with ${buySell.toFixed(2)}x buy/sell and vol/liquidity ${volLiq.toFixed(2)}.`
+  };
+}
+
+async function getJSON(path){
+  const r = await fetch(`${API}${path}`);
+  if(!r.ok) throw new Error(`${path} ${r.status}`);
+  return r.json();
+}
+
+async function runScan(){
+  const start = Date.now();
+  $('status').textContent = 'Scanning live feeds...';
+  $('results').innerHTML = '';
+
+  try {
+    const [boosts, profiles] = await Promise.all([
+      getJSON('/token-boosts/top/v1'),
+      getJSON('/token-profiles/latest/v1')
+    ]);
+
+    const addresses = [...new Set([
+      ...(boosts || []).map(x => x.tokenAddress).filter(Boolean),
+      ...(profiles || []).map(x => x.tokenAddress).filter(Boolean)
+    ])].slice(0, 50);
+
+    if (!addresses.length) throw new Error('No token addresses returned from source endpoints.');
+
+    const pairRes = await getJSON(`/tokens/v1/all/${addresses.join(',')}`);
+    const pairs = Array.isArray(pairRes) ? pairRes : (pairRes.pairs || []);
+
+    const chain = $('chain').value;
+    const minLiq = Number($('minLiq').value);
+
+    const enriched = pairs
+      .filter(p => p && p.liquidity?.usd >= minLiq)
+      .filter(p => chain === 'all' ? true : p.chainId === chain)
+      .map(p => ({ ...p, analysis: scorePair(p) }))
+      .sort((a,b) => b.analysis.score - a.analysis.score)
+      .slice(0, 10);
+
+    render(enriched);
+    const elapsed = ((Date.now() - start) / 1000).toFixed(2);
+    $('scanStats').textContent = `Scan stats: ${enriched.length}/10 shown | ${pairs.length} pairs analyzed | ${elapsed}s`;
+    $('status').textContent = `Done. Updated ${new Date().toISOString()}`;
+  } catch (e) {
+    $('status').textContent = `Error: ${e.message}`;
+    $('results').innerHTML = `<div class="card">Failed to scan live data. ${e.message}</div>`;
+  }
+}
+
+function render(items){
+  if(!items.length){
+    $('results').innerHTML = '<div class="card">No tokens matched filters. Lower liquidity threshold or switch chain.</div>';
+    return;
+  }
+
+  $('results').innerHTML = items.map((p, idx) => {
+    const a = p.analysis;
+    const web = p.info?.websites?.[0]?.url;
+    const tw = p.info?.socials?.find(s => s.type === 'twitter')?.url;
+    return `
+      <div class="card">
+        <div class="cardTop">
+          <div>
+            <div class="pair">#${idx+1} ${p.baseToken?.symbol || '?'} / ${p.quoteToken?.symbol || '?'} · ${p.chainId?.toUpperCase()}</div>
+            <div class="price">Price: ${usd(p.priceUsd)} · Liquidity: ${usd(p.liquidity?.usd || 0)}</div>
+          </div>
+          <div class="score">Score ${a.score}/100</div>
+        </div>
+        <div class="metrics">
+          <div class="metric"><span>Δ5m:</span> <span class="delta ${p.priceChange?.m5>=0?'pos':'neg'}">${pct(p.priceChange?.m5 || 0)}</span></div>
+          <div class="metric"><span>Δ1h:</span> <span class="delta ${p.priceChange?.h1>=0?'pos':'neg'}">${pct(p.priceChange?.h1 || 0)}</span></div>
+          <div class="metric"><span>Δ6h:</span> <span class="delta ${p.priceChange?.h6>=0?'pos':'neg'}">${pct(p.priceChange?.h6 || 0)}</span></div>
+          <div class="metric"><span>Vol 24h:</span> ${usd(p.volume?.h24 || 0)}</div>
+          <div class="metric"><span>Tx 1h:</span> ${(p.txns?.h1?.buys || 0)}B / ${(p.txns?.h1?.sells || 0)}S</div>
+          <div class="metric"><span>MCap/FDV:</span> ${usd(p.marketCap || p.fdv || 0)}</div>
+        </div>
+        <details>
+          <summary>Signal Analysis & rationale</summary>
+          <div class="tags">
+            ${a.good.map(t => `<span class="tag good">${t}</span>`).join('')}
+            ${a.warn.map(t => `<span class="tag warn">${t}</span>`).join('')}
+          </div>
+          <div>${a.rationale}</div>
+          <div class="links" style="margin-top:8px">
+            <a href="${p.url}" target="_blank" rel="noopener">DexScreener</a>
+            ${web ? `<a href="${web}" target="_blank" rel="noopener">Website</a>` : ''}
+            ${tw ? `<a href="${tw}" target="_blank" rel="noopener">Twitter</a>` : ''}
+          </div>
+        </details>
+      </div>`;
+  }).join('');
+}
+
+$('scanBtn').addEventListener('click', runScan);
+runScan();
+</script>
+</body>
+</html>
